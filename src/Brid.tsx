@@ -1,0 +1,365 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "./components/ui/card";
+import { Input } from "./components/ui/input";
+
+export default function BridgeScoreApp() {
+  const numTables = 16; // 16 tablillas
+  const numRowsPerTable = 4; // 4 filas por tablilla
+
+  // Predefined names for couples
+  const predefinedNames = {
+    1: "Maria Isabel & ",
+    3: "Ximena & Mario",
+    2: "Moty & Anthony",
+    6: "Marcela & Carolina",
+    8: "Juanita & Isabel",
+    7: "Joan & Soledad",
+    4: "Malu & Belen",
+    5: "Diana & Xavier",
+  };
+
+  // Función para asignar "Pareja NS-EO" basado en el número de tablilla
+  const getParejaData = (tablillaIndex) => {
+    if (tablillaIndex >= 1 && tablillaIndex <= 4) {
+      // Tablillas 1 a 4
+      return [
+        { ns: 1, eo: 5 },
+        { ns: 2, eo: 6 },
+        { ns: 3, eo: 7 },
+        { ns: 4, eo: 8 },
+      ];
+    } else if (tablillaIndex >= 5 && tablillaIndex <= 8) {
+      // Tablillas 5 a 8
+      return [
+        { ns: 1, eo: 6 },
+        { ns: 2, eo: 7 },
+        { ns: 3, eo: 8 },
+        { ns: 4, eo: 5 },
+      ];
+    } else if (tablillaIndex >= 9 && tablillaIndex <= 12) {
+      // Tablillas 9 a 12
+      return [
+        { ns: 1, eo: 7 },
+        { ns: 2, eo: 8 },
+        { ns: 3, eo: 5 },
+        { ns: 4, eo: 6 },
+      ];
+    } else if (tablillaIndex >= 13 && tablillaIndex <= 16) {
+      // Tablillas 13 a 16
+      return [
+        { ns: 1, eo: 8 },
+        { ns: 2, eo: 5 },
+        { ns: 3, eo: 6 },
+        { ns: 4, eo: 7 },
+      ];
+    }
+    // Default fallback (should not happen)
+    return Array(numRowsPerTable).fill({ ns: 0, eo: 0 });
+  };
+
+  // Estado para almacenar los datos de los juegos
+  const [games, setGames] = useState(
+    Array(numTables)
+      .fill(null)
+      .map((_, tablillaIndex) => {
+        const parejaData = getParejaData(tablillaIndex + 1);
+        return parejaData.map((pareja) => ({
+          ...pareja, // Include ns and eo from parejaData
+          contr: "N", // Valor por defecto para Contr
+          rdo: "",
+          puntacionNS: 0,
+          puntacionEO: 0,
+        }));
+      })
+  );
+
+  // Estado para almacenar los puntos totales de cada pareja
+  const [totalScores, setTotalScores] = useState({
+    ns: { 1: 0, 2: 0, 3: 0, 4: 0 }, // Puntos totales para parejas NS (1-4)
+    eo: { 5: 0, 6: 0, 7: 0, 8: 0 }, // Puntos totales para parejas EO (5-8)
+  });
+
+  // Actualizar los datos del juego
+  const updateGame = (tablillaIndex, rowIndex, field, value) => {
+    const newGames = [...games];
+    newGames[tablillaIndex][rowIndex] = {
+      ...newGames[tablillaIndex][rowIndex],
+      [field]: value,
+    };
+    setGames(newGames);
+  };
+
+  // Calcular las puntuaciones automáticamente cuando cambia el estado de games
+  useEffect(() => {
+    const newGames = games.map((tableGames, tablillaIndex) => {
+      // Calcular el Rdo ajustado y asignar rankings
+      const rowsWithRanking = tableGames.map((game) => {
+        const rdoValue = parseFloat(game.rdo) || 0; // Allow negative numbers
+
+        // Calculate adjustedRdo based on contr
+        let adjustedRdo;
+        if (game.contr === "N" || game.contr === "S") {
+          adjustedRdo = rdoValue; // Negative for N or S
+        } else {
+          adjustedRdo = -rdoValue; // Positive for E or O
+        }
+
+        return {
+          ...game,
+          adjustedRdo,
+        };
+      });
+
+      // Ordenar por adjustedRdo (de mayor a menor)
+      const sortedRows = [...rowsWithRanking].sort(
+        (a, b) => b.adjustedRdo - a.adjustedRdo
+      );
+
+      // Asignar rankings (1º, 2º, 3º, 4º) basados en adjustedRdo
+      const rankedRows = rowsWithRanking.map((row) => {
+        const rank =
+          sortedRows.findIndex((r) => r.adjustedRdo === row.adjustedRdo) + 1;
+        return {
+          ...row,
+          rank,
+        };
+      });
+
+      // Calcular puntuaciones NS y EO basadas en el ranking
+      return rankedRows.map((row) => {
+        // Find all rows with the same adjustedRdo (ties)
+        const tiedRows = rankedRows.filter(
+          (r) => r.adjustedRdo === row.adjustedRdo
+        );
+
+        // Determine the total points based on the tied rank
+        let totalPoints;
+        if (tiedRows.length === 4 && row.rank === 1) {
+          // 4 tied in 1st
+          totalPoints = 19.9;
+        } else if (tiedRows.length === 3 && row.rank === 1) {
+          // 3 tied in 1st
+          totalPoints = 19.9;
+        } else if (tiedRows.length === 2 && row.rank === 1) {
+          // 2 tied in 1st
+          totalPoints = 16.6;
+        } else if (tiedRows.length === 3 && row.rank === 2) {
+          // 3 tied in 2nd
+          totalPoints = 9.9;
+        } else if (tiedRows.length === 2 && row.rank === 2) {
+          // 2 tied in 2nd
+          totalPoints = 9.9;
+        } else if (tiedRows.length === 2 && row.rank === 3) {
+          // 2 tied in 3rd
+          totalPoints = 3.3;
+        } else {
+          // No tie or single team in rank
+          totalPoints =
+            row.rank === 1
+              ? 10
+              : row.rank === 2
+              ? 6.6
+              : row.rank === 3
+              ? 3.3
+              : 0;
+        }
+
+        // Divide the total points equally among the tied couples
+        const puntacionNS = totalPoints / tiedRows.length;
+        const puntacionEO = 10 - puntacionNS;
+
+        return {
+          ...row,
+          puntacionNS,
+          puntacionEO,
+        };
+      });
+    });
+    setGames(newGames);
+
+    // Calcular los puntos totales de cada pareja
+    const newTotalScores = {
+      ns: { 1: 0, 2: 0, 3: 0, 4: 0 },
+      eo: { 5: 0, 6: 0, 7: 0, 8: 0 },
+    };
+    newGames.forEach((tableGames) => {
+      tableGames.forEach((game) => {
+        if (game.ns >= 1 && game.ns <= 4) {
+          newTotalScores.ns[game.ns] += game.puntacionNS;
+        }
+        if (game.eo >= 5 && game.eo <= 8) {
+          newTotalScores.eo[game.eo] += game.puntacionEO;
+        }
+      });
+    });
+    setTotalScores(newTotalScores);
+  }, [games]); // Recalculate scores whenever games state changes
+
+  // Crear el leaderboard para NS (1-4) y EO (5-8)
+  const nsLeaderboard = Object.entries(totalScores.ns)
+    .sort((a, b) => b[1] - a[1]) // Ordenar de mayor a menor
+    .map(([couple, score]) => ({
+      couple: predefinedNames[couple], // Use the predefined names
+      score: ((score / 160) * 100).toFixed(2), // Convert to percentage
+    }));
+
+  const eoLeaderboard = Object.entries(totalScores.eo)
+    .sort((a, b) => b[1] - a[1]) // Ordenar de mayor a menor
+    .map(([couple, score]) => ({
+      couple: predefinedNames[couple], // Use the predefined names
+      score: ((score / 160) * 100).toFixed(2), // Convert to percentage
+    }));
+
+  return (
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold text-center text-blue-800 mb-8">
+        Duplicate Bridge Score Tracker
+      </h1>
+
+      {/* Leaderboards side by side */}
+      <div className="flex justify-center space-x-6">
+        {/* Leaderboard for NS (1-4) */}
+        <div className="bg-white rounded-lg shadow-md p-6 w-1/2">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
+            Leaderboard NS (1-4)
+          </h2>
+          <table className="w-full">
+            <thead>
+              <tr className="bg-blue-100">
+                <th className="p-3 text-center text-blue-800">Pareja</th>
+                <th className="p-3 text-center text-blue-800">Puntos (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nsLeaderboard.map((entry, index) => (
+                <tr
+                  key={index}
+                  className="border-b hover:bg-gray-50 transition-colors"
+                >
+                  <td className="p-3 text-gray-700 text-center">
+                    {entry.couple}
+                  </td>
+                  <td className="p-3 text-gray-700 font-medium text-center">
+                    {entry.score}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Leaderboard for EO (5-8) */}
+        <div className="bg-white rounded-lg shadow-md p-6 w-1/2">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
+            Leaderboard EO (5-8)
+          </h2>
+          <table className="w-full">
+            <thead>
+              <tr className="bg-blue-100">
+                <th className="p-3 text-center text-blue-800">Pareja</th>
+                <th className="p-3 text-center text-blue-800">Puntos (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eoLeaderboard.map((entry, index) => (
+                <tr
+                  key={index}
+                  className="border-b hover:bg-gray-50 transition-colors"
+                >
+                  <td className="p-3 text-gray-700 text-center">
+                    {entry.couple}
+                  </td>
+                  <td className="p-3 text-gray-700 font-medium text-center">
+                    {entry.score}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Grid of tables */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {games.map((tableGames, tablillaIndex) => (
+          <Card key={tablillaIndex} className="bg-white rounded-lg shadow-md">
+            <CardContent className="p-4">
+              <p className="text-xl font-semibold text-gray-800 mb-4 text-center">
+                Tablilla {tablillaIndex + 1}
+              </p>
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th colSpan="2" className="p-2 text-blue-800 text-center">
+                      Pareja NS-EO
+                    </th>
+                    <th className="p-2 text-blue-800 text-center">Contr</th>
+                    <th className="p-2 text-blue-800 text-center">Rdo</th>
+                    <th colSpan="2" className="p-2 text-blue-800 text-center">
+                      Puntacion NS-EO
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableGames.map((game, rowIndex) => {
+                    return (
+                      <tr
+                        key={rowIndex}
+                        className="border-b hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="p-2 text-gray-700 text-center">
+                          {predefinedNames[game.ns]}
+                        </td>
+                        <td className="p-2 text-gray-700 text-center">
+                          {predefinedNames[game.eo]}
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            type="text"
+                            placeholder="Contr"
+                            value={game.contr}
+                            onChange={(e) =>
+                              updateGame(
+                                tablillaIndex,
+                                rowIndex,
+                                "contr",
+                                e.target.value
+                              )
+                            }
+                            className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            type="text"
+                            placeholder="Rdo"
+                            value={game.rdo}
+                            onChange={(e) =>
+                              updateGame(
+                                tablillaIndex,
+                                rowIndex,
+                                "rdo",
+                                e.target.value
+                              )
+                            }
+                            className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                          />
+                        </td>
+                        <td className="p-2 text-gray-700 text-center">
+                          {game.puntacionNS.toFixed(2)}
+                        </td>
+                        <td className="p-2 text-gray-700 text-center">
+                          {game.puntacionEO.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
